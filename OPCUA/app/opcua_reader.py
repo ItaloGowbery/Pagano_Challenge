@@ -1,62 +1,63 @@
+from opcua import ua, Server
+import random
 import time
-from opcua import Client
+import threading
 
+# Configurações do Servidor
+server = Server()
+server.set_endpoint("opc.tcp://0.0.0.0:4840/freeopcua/server/")
 
-def NomeDoNo(x):
-    x = str(x)
+# Adicionando um namespace
+uri = "http://examples.freeopcua.github.iohttp://examples.freeopcua.github.io"
+idx = server.register_namespace(uri)
 
-    if(x == 'ns=3;i=1002'):
-        return 'counter'
-    if(x == 'ns=3;i=1003'):
-        return 'random'
-    if(x == 'ns=3;i=1004'):
-        return 'sawtooth'        
-    if(x == 'ns=3;i=1005'):
-        return 'sinusoid'
-    if(x == 'ns=3;i=1006'):
-        return 'square'
-    if(x == 'ns=3;i=1007'):
-        return 'triangle'
+# Criando um objeto e variáveis no servidor
+objects = server.get_objects_node()
+myobj = objects.add_object(idx, "MyObject")
 
-        
-# URL do seu servidor OPC UA
-url = "opc.tcp://DESKTOP-AE3RLGJ.mshome.net:53530/OPCUA/SimulationServer"
+# Adicionando variáveis
+counter = myobj.add_variable(idx, "Counter", 0)
+random_val_30_60 = myobj.add_variable(idx, "RandomValue30to60", 0)
+random_val_0_1000 = myobj.add_variable(idx, "RandomValue0to1000", 0)
+random_val_0_5000 = myobj.add_variable(idx, "RandomValue0to5000", 0)
 
-# Cria uma instância do cliente e conecta ao servidor
-client = Client(url)
-client.connect()
+# Permitir a gravação nas variáveis
+counter.set_writable()
+random_val_30_60.set_writable()
+random_val_0_1000.set_writable()
+random_val_0_5000.set_writable()
 
-print("Conectado ao servidor OPC UA")
+# Função para atualizar os valores das tags periodicamente
+def update_tags():
+    count = 0
+    while True:
+        count += 1
+        random_30_60 = random.randint(30, 60)
+        random_0_1000 = random.randint(0, 1000)
+        random_0_5000 = random.randint(0, 5000)
+
+        print(f"Atualizando tags - Counter: {count}, Random 1: {random_30_60}, Random 2: {random_0_1000}, Random 3: {random_0_5000}")
+
+        counter.set_value(count)
+        random_val_30_60.set_value(random_30_60)
+        random_val_0_1000.set_value(random_0_1000)
+        random_val_0_5000.set_value(random_0_5000)
+
+        time.sleep(1)
+
+# Iniciar o servidor
+server.start()
+print("Servidor OPC UA iniciado na URL opc.tcp://0.0.0.0:4840/freeopcua/server/")
+
+# Iniciar a atualização das tags em uma thread separada
+thread = threading.Thread(target=update_tags)
+thread.start()
 
 try:
-    # Lista de NodeIds dos nós que queremos ler
-    node_ids = [
-        "ns=3;i=1002",
-        "ns=3;i=1003",
-        "ns=3;i=1004",
-        "ns=3;i=1005",
-        "ns=3;i=1006",
-        "ns=3;i=1007"
-    ]
-    
+    # Manter o servidor rodando
     while True:
-        print("Valores dos nós:")
-        for node_id in node_ids:
-            try:
-                myvar = client.get_node(node_id)
-                value = myvar.get_value()
-                
-                nome = NomeDoNo(node_id)
-                print(f"Valor do nó {nome}: {value}")
-            except Exception as e:
-                print(f"Erro ao ler o nó {node_id}: {e}")
-        
-        # Espera 5 segundos antes de ler novamente
         time.sleep(1)
-        print('')
-
-finally:
-    # Desconecta do servidor
-    client.disconnect()
-    print("Desconectado do servidor OPC UA")
-
+except KeyboardInterrupt:
+    # Parar o servidor em caso de interrupção
+    print("Servidor OPC UA interrompido")
+    server.stop()
