@@ -12,3 +12,8 @@ POSTGRES_DSN = os.getenv(
 
 READ_INTERVAL = float(os.getenv("READ_INTERVAL", "5"))
 SINK_INTERVAL = float(os.getenv("SINK_INTERVAL", "5"))
+
+MINIO_ENDPOINT = os.getenv("MINIO_ENDPOINT", "http://localhost:9000")
+MINIO_ACCESS_KEY = os.getenv("MINIO_ACCESS_KEY", "minioadmin")
+MINIO_SECRET_KEY = os.getenv("MINIO_SECRET_KEY", "minioadmin")
+MINIO_BUCKET = os.getenv("MINIO_BUCKET", "telemetry")
