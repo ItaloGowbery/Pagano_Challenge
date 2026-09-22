@@ -40,6 +40,9 @@ class Reader(ABC):
     async def stop(self) -> None:
         """Fecha conexões."""
 
+    async def commit(self) -> None:
+        """Confirma o que foi lido. Só faz sentido para fontes com posição."""
+
     @abstractmethod
     async def read(self) -> list[DataPack]:
         """Devolve o que houver para ler agora. Pode vir lista vazia."""
@@ -83,6 +86,7 @@ class Operation:
             log.debug("[%s] nada para ler", self.name)
             return
         await self.writer.write(packs)
+        await self.reader.commit()
         log.info("[%s] %d registro(s) movido(s)", self.name, len(packs))
 
 
@@ -104,13 +108,13 @@ class Scheduler:
             except asyncio.CancelledError:
                 raise
             except Exception:
-                log.exception("[%s] falhou, tentando de novo em %.0fs", op.name, op.interval)
+                log.exception("[%s] falhou, tentando de novo em %.1fs", op.name, op.interval)
             await asyncio.sleep(op.interval)
 
     async def run(self) -> None:
         for op in self.operations:
             await op.start()
-            log.info("operation '%s' iniciada (a cada %.0fs)", op.name, op.interval)
+            log.info("operation '%s' iniciada (a cada %.1fs)", op.name, op.interval)
 
         self._tasks = [asyncio.create_task(self._loop(op)) for op in self.operations]
         try:
