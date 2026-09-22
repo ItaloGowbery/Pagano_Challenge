@@ -1,13 +1,11 @@
+import json
 import logging
 from datetime import datetime, timezone
 
+from aiokafka import AIOKafkaConsumer
 from asyncua import Client, ua
 
 from .core import DataPack, Reader
-
-import json
-
-from aiokafka import AIOKafkaConsumer
 
 log = logging.getLogger(__name__)
 
@@ -30,23 +28,36 @@ class OpcuaReader(Reader):
             await self._client.disconnect()
             self._client = None
 
+    async def _reconnect(self) -> None:
+        log.warning("reconectando ao OPC-UA...")
+        try:
+            await self.stop()
+        except Exception:
+            pass
+        self._client = None
+        await self.start()
+
     async def read(self) -> list[DataPack]:
         if self._client is None:
             await self.start()
 
         packs: list[DataPack] = []
-        for tag in self.tags:
-            node = self._client.get_node(tag)
-            dv = await node.read_data_value()
-            packs.append(
-                DataPack(
-                    tag=tag,
-                    value=float(dv.Value.Value) if dv.Value.Value is not None else None,
-                    status="good" if dv.StatusCode.is_good() else "bad",
-                    timestamp=dv.SourceTimestamp or datetime.now(timezone.utc),
+        try:
+            for tag in self.tags:
+                node = self._client.get_node(tag)
+                dv = await node.read_data_value()
+                packs.append(
+                    DataPack(
+                        tag=tag,
+                        value=float(dv.Value.Value) if dv.Value.Value is not None else None,
+                        status="good" if dv.StatusCode.is_good() else "bad",
+                        timestamp=dv.SourceTimestamp or datetime.now(timezone.utc),
+                    )
                 )
-            )
+        except (ua.UaError, ConnectionError, OSError):
+            await self._reconnect()
         return packs
+
 
 class KafkaReader(Reader):
     """Consome um tópico e devolve o que chegou desde a última leitura."""
