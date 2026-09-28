@@ -11,6 +11,11 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./sql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pipeline -d telemetry"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   kafka:
     image: apache/kafka:3.8.0
@@ -31,6 +36,12 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
       CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 15
+      start_period: 20s
 
   minio:
     image: quay.io/minio/minio:RELEASE.2025-02-18T16-25-55Z
@@ -44,14 +55,23 @@ services:
       MINIO_ROOT_PASSWORD: minioadmin
     volumes:
       - miniodata:/data
+    healthcheck:
+      test: ["CMD-SHELL", "mc ready local || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   pipeline:
     build: .
     container_name: pipeline
+    restart: unless-stopped
     depends_on:
-      - kafka
-      - postgres
-      - minio
+      kafka:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
     environment:
       OPCUA_URL: opc.tcp://host.docker.internal:4840/freeopcua/server/
       KAFKA_BOOTSTRAP: kafka:9094
